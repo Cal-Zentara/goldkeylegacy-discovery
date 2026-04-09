@@ -1353,6 +1353,7 @@
   const choiceValues = {};
   let selectedTheme = '';
   let toastTimer = null;
+  let isSubmitting = false;
 
   /* ── AUTOSAVE ── */
   function saveProgress() {
@@ -1360,13 +1361,20 @@
     document.querySelectorAll('input[name], textarea[name]').forEach(el => {
       if (el.name && el.type !== 'hidden') textData[el.name] = el.value;
     });
-    const state = { section: currentSection, theme: selectedTheme, choices: choiceValues, text: textData };
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch(e) {}
-    showToast();
+    const state = { section: currentSection, theme: selectedTheme, choices: { ...choiceValues }, text: textData };
+    let saved = false;
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+      saved = true;
+    } catch(e) {
+      console.error('[GKL] autosave failed:', e);
+    }
+    if (saved) showToast();
   }
 
   function showToast() {
     const t = document.getElementById('save-toast');
+    if (!t) return;
     t.style.opacity = '1';
     t.style.transform = 'translateX(-50%) translateY(0)';
     clearTimeout(toastTimer);
@@ -1378,57 +1386,81 @@
 
   function restoreProgress() {
     let state;
-    try { state = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch(e) { return false; }
-    if (!state || !state.theme) return false;
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return false;
+      state = JSON.parse(raw);
+    } catch(e) {
+      console.error('[GKL] restore failed — corrupted data, clearing:', e);
+      try { localStorage.removeItem(SAVE_KEY); } catch(_) {}
+      return false;
+    }
+    if (!state || typeof state !== 'object') return false;
 
-    // Restore theme
-    pickTheme(state.theme, true);
+    // Restore theme if present
+    if (state.theme) {
+      pickTheme(state.theme, true);
+    }
 
     // Restore text inputs
-    if (state.text) {
+    if (state.text && typeof state.text === 'object') {
       Object.entries(state.text).forEach(([name, val]) => {
-        const el = document.querySelector(`[name="${name}"]`);
-        if (el) el.value = val;
+        const el = document.querySelector(`[name="${CSS.escape(name)}"]`);
+        if (el && 'value' in el) el.value = val || '';
       });
     }
 
-    // Restore choice buttons
-    if (state.choices) {
+    // Restore choice buttons (outside the loop for vibe/security cards)
+    if (state.choices && typeof state.choices === 'object') {
+      // Restore regular choice buttons first
       Object.entries(state.choices).forEach(([name, val]) => {
+        if (typeof val !== 'string') return;
         choiceValues[name] = val;
-        const group = document.querySelector(`.choices[data-name="${name}"]`);
+        const group = document.querySelector(`.choices[data-name="${CSS.escape(name)}"]`);
         if (group) {
-          const vals = val.split(', ');
+          const vals = val.split(', ').map(v => v.trim());
           group.querySelectorAll('.choice-btn').forEach(btn => {
             if (vals.includes(btn.textContent.trim())) btn.classList.add('selected');
           });
         }
-        // Vibe cards
-        const vibeContainer = document.querySelector('.vibe-cards');
-        if (name === 'q21' && vibeContainer) {
-          vibeContainer.querySelectorAll('.vibe-card').forEach(card => {
-            if (card.querySelector('.vibe-title').textContent === val) {
-              card.classList.add('selected');
-              document.getElementById('q21-value').value = val;
-            }
-          });
-        }
-        // Security cards
-        if (name === 'q42') {
-          document.querySelectorAll('.security-card').forEach(card => {
-            if (card.querySelector('.sc-title').textContent === val) {
-              card.classList.add('selected');
-              document.getElementById('q42-value').value = val;
-            }
-          });
-        }
       });
+
+      // Restore vibe cards (q21) — separate pass, outside the main loop
+      const q21Val = state.choices['q21'];
+      if (q21Val && typeof q21Val === 'string') {
+        const vibeContainer = document.querySelector('.vibe-cards');
+        const vibeHidden = document.getElementById('q21-value');
+        if (vibeContainer) {
+          vibeContainer.querySelectorAll('.vibe-card').forEach(card => {
+            const titleEl = card.querySelector('.vibe-title');
+            if (titleEl && titleEl.textContent === q21Val) {
+              card.classList.add('selected');
+              if (vibeHidden) vibeHidden.value = q21Val;
+            }
+          });
+        }
+      }
+
+      // Restore security cards (q42) — separate pass
+      const q42Val = state.choices['q42'];
+      if (q42Val && typeof q42Val === 'string') {
+        const secHidden = document.getElementById('q42-value');
+        document.querySelectorAll('.security-card').forEach(card => {
+          const titleEl = card.querySelector('.sc-title');
+          if (titleEl && titleEl.textContent === q42Val) {
+            card.classList.add('selected');
+            if (secHidden) secHidden.value = q42Val;
+          }
+        });
+      }
     }
 
-    // Restore section
-    if (state.section && state.section > 0) {
-      goTo(state.section);
+    // Restore section — must happen after choices are restored
+    const savedSection = state.section;
+    if (typeof savedSection === 'number' && savedSection >= 0 && savedSection <= TOTAL_SECTIONS) {
+      goTo(savedSection);
     }
+
     return true;
   }
 
@@ -1453,7 +1485,7 @@
 
   /* ── NAVIGATION ── */
   function goTo(n) {
-    document.getElementById('section-' + currentSection).classList.remove('active');
+    document.getElementById('section-' + currentSection)?.classList.remove('active');
     currentSection = n;
     const target = document.getElementById('section-' + n) || document.getElementById('success');
     if (target) target.classList.add('active');
@@ -1492,7 +1524,8 @@
     card.closest('.vibe-cards').querySelectorAll('.vibe-card').forEach(c => c.classList.remove('selected'));
     card.classList.add('selected');
     const title = card.querySelector('.vibe-title').textContent;
-    document.getElementById(name + '-value').value = title;
+    const hidden = document.getElementById(name + '-value');
+    if (hidden) hidden.value = title;
     choiceValues[name] = title;
     saveProgress();
   }
@@ -1501,7 +1534,8 @@
     card.closest('.security-choice').querySelectorAll('.security-card').forEach(c => c.classList.remove('selected'));
     card.classList.add('selected');
     const title = card.querySelector('.sc-title').textContent;
-    document.getElementById(name + '-value').value = title;
+    const hidden = document.getElementById(name + '-value');
+    if (hidden) hidden.value = title;
     choiceValues[name] = title;
     saveProgress();
   }
@@ -1515,6 +1549,12 @@
 
   /* ── SUBMIT ── */
   function submitForm() {
+    if (isSubmitting) return;
+    isSubmitting = true;
+
+    const submitBtn = document.querySelector('#section-7 .btn-next');
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Sending…'; }
+
     const data = new FormData();
 
     document.querySelectorAll('input[name], textarea[name], select[name]').forEach(el => {
@@ -1525,27 +1565,56 @@
       if (val) data.append(key, val);
     });
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+
     fetch('https://formspree.io/f/xvzvnkay', {
       method: 'POST',
       body: data,
-      headers: { 'Accept': 'application/json' }
+      headers: { 'Accept': 'application/json' },
+      signal: controller.signal
     })
     .then(res => {
+      clearTimeout(timeout);
       if (res.ok) {
         try { localStorage.removeItem(SAVE_KEY); } catch(e) {}
-        document.getElementById('section-' + currentSection).classList.remove('active');
+        document.getElementById('section-' + currentSection)?.classList.remove('active');
         document.getElementById('success').classList.add('active');
         document.getElementById('progressFill').style.width = '100%';
         document.getElementById('progressPct').textContent = '100% complete';
         document.getElementById('sectionLabel').textContent = 'All done';
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
-        alert('Something went wrong. Please try again or contact Cal directly.');
+        console.error('[GKL] submit failed — HTTP', res.status);
+        showSubmitError('Submission failed. Please try again.');
+        resetSubmitBtn(submitBtn);
       }
     })
-    .catch(() => {
-      alert('Something went wrong. Please try again or contact Cal directly.');
+    .catch(err => {
+      clearTimeout(timeout);
+      console.error('[GKL] submit error:', err);
+      const msg = err.name === 'AbortError'
+        ? 'Request timed out. Check your connection and try again.'
+        : 'Something went wrong. Please try again or text Cal directly.';
+      showSubmitError(msg);
+      resetSubmitBtn(submitBtn);
     });
+  }
+
+  function showSubmitError(msg) {
+    let el = document.getElementById('submit-error');
+    if (!el) {
+      el = document.createElement('p');
+      el.id = 'submit-error';
+      el.style.cssText = 'color:#e05a5a;font-size:0.82rem;text-align:center;margin-top:12px;';
+      document.querySelector('#section-7 .nav-buttons').after(el);
+    }
+    el.textContent = msg;
+  }
+
+  function resetSubmitBtn(btn) {
+    isSubmitting = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'Submit →'; }
   }
 
   /* ── ON LOAD — try to restore saved progress ── */

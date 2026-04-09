@@ -53,152 +53,193 @@
     }
 
     /* ════════════════════════════════
-       THEME PICKER SCREEN
+       THEME PICKER — FULL SCREEN SPLIT
     ════════════════════════════════ */
     .theme-screen {
-      min-height: 100vh;
+      position: fixed;
+      inset: 0;
       display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 40px 20px;
-      background: #111;
+      z-index: 999;
     }
 
     .theme-screen.hidden { display: none; }
 
-    .theme-screen .ts-logo {
-      height: 80px;
-      margin-bottom: 36px;
+    /* Label floating above the split */
+    .ts-label {
+      position: absolute;
+      top: 32px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      text-align: center;
+      pointer-events: none;
     }
 
-    .theme-screen .ts-title {
+    .ts-label h2 {
       font-family: 'Playfair Display', serif;
-      font-size: 2rem;
-      color: #f0ebe0;
-      text-align: center;
-      margin-bottom: 10px;
-      line-height: 1.3;
+      font-size: 1.3rem;
+      color: #fff;
+      letter-spacing: 0.06em;
+      text-shadow: 0 2px 20px rgba(0,0,0,0.8);
+      white-space: nowrap;
     }
 
-    .theme-screen .ts-subtitle {
-      font-size: 0.95rem;
-      color: #9ca3af;
-      text-align: center;
-      margin-bottom: 48px;
-      line-height: 1.6;
+    .ts-label p {
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.55);
+      margin-top: 4px;
+      white-space: nowrap;
     }
 
-    .theme-cards {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      width: 100%;
-      max-width: 680px;
+    /* Gold divider line down the middle */
+    .ts-divider {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 2px;
+      height: 100%;
+      background: linear-gradient(180deg, transparent 0%, #c9a24a 20%, #c9a24a 80%, transparent 100%);
+      z-index: 5;
+      pointer-events: none;
     }
 
-    .theme-card {
-      border-radius: 20px;
-      overflow: hidden;
-      cursor: pointer;
-      border: 2px solid transparent;
-      transition: all 0.3s;
-      position: relative;
-    }
-
-    .theme-card:hover {
-      border-color: var(--gold);
-      transform: translateY(-4px);
-      box-shadow: 0 20px 60px rgba(201, 162, 74, 0.25);
-    }
-
-    .theme-card .tc-preview {
-      height: 200px;
+    /* Each half */
+    .ts-half {
+      flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 24px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: flex 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    .tc-dark .tc-preview {
-      background: #0d0d0d;
-      border-bottom: 1px solid #2a2a2a;
+    .ts-half::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity 0.3s;
     }
 
-    .tc-light .tc-preview {
+    .ts-half:hover { flex: 1.15; }
+
+    .ts-dark {
+      background: #0a0a0a;
+    }
+
+    .ts-dark::after {
+      background: radial-gradient(ellipse at center, rgba(201,162,74,0.12) 0%, transparent 70%);
+    }
+
+    .ts-light {
       background: #faf8f3;
-      border-bottom: 1px solid #e5e0d5;
     }
 
-    .theme-card .tc-preview img {
-      height: 70px;
-      margin-bottom: 14px;
+    .ts-light::after {
+      background: radial-gradient(ellipse at center, rgba(201,162,74,0.18) 0%, transparent 70%);
     }
 
-    .theme-card .tc-preview .tc-mock-line {
-      height: 3px;
-      border-radius: 99px;
-      background: linear-gradient(90deg, #a07830, #e8c97a);
-      width: 60px;
-      margin: 6px auto;
+    .ts-half:hover::after { opacity: 1; }
+
+    /* Logo — the hero of each half */
+    .ts-half .ts-logo {
+      width: 70%;
+      max-width: 320px;
+      min-width: 180px;
+      height: auto;
+      position: relative;
+      z-index: 2;
+      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                  filter 0.4s ease;
+      filter: drop-shadow(0 8px 40px rgba(0,0,0,0.5));
     }
 
-    .theme-card .tc-preview .tc-mock-text {
-      width: 80px;
-      height: 6px;
-      border-radius: 99px;
-      margin: 4px auto;
+    .ts-dark:hover .ts-logo {
+      transform: scale(1.06);
+      filter: drop-shadow(0 12px 60px rgba(201,162,74,0.4));
     }
 
-    .tc-dark .tc-preview .tc-mock-text { background: #2a2a2a; }
-    .tc-light .tc-preview .tc-mock-text { background: #e5e0d5; }
-
-    .theme-card .tc-info {
-      padding: 20px;
+    .ts-light:hover .ts-logo {
+      transform: scale(1.06);
+      filter: drop-shadow(0 12px 60px rgba(160,120,48,0.35));
     }
 
-    .tc-dark .tc-info { background: #1a1a1a; }
-    .tc-light .tc-info { background: #ffffff; }
+    /* Bottom label + button on each half */
+    .ts-half-footer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 28px 32px;
+      z-index: 3;
+      text-align: center;
+    }
 
-    .theme-card .tc-name {
+    .ts-dark .ts-half-footer {
+      background: linear-gradient(0deg, rgba(0,0,0,0.85) 0%, transparent 100%);
+    }
+
+    .ts-light .ts-half-footer {
+      background: linear-gradient(0deg, rgba(240,235,224,0.92) 0%, transparent 100%);
+    }
+
+    .ts-half-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.4rem;
       font-weight: 700;
-      font-size: 1rem;
       margin-bottom: 4px;
-      letter-spacing: 0.02em;
+      letter-spacing: 0.03em;
     }
 
-    .tc-dark .tc-name { color: #c9a24a; }
-    .tc-light .tc-name { color: #a07830; }
+    .ts-dark .ts-half-name { color: #c9a24a; }
+    .ts-light .ts-half-name { color: #a07830; }
 
-    .theme-card .tc-desc {
+    .ts-half-desc {
       font-size: 0.8rem;
+      margin-bottom: 18px;
       line-height: 1.5;
     }
 
-    .tc-dark .tc-desc { color: #9ca3af; }
-    .tc-light .tc-desc { color: #6b7280; }
+    .ts-dark .ts-half-desc { color: rgba(255,255,255,0.55); }
+    .ts-light .ts-half-desc { color: #6b7280; }
 
-    .theme-card .tc-pick-btn {
-      display: block;
-      width: calc(100% - 40px);
-      margin: 0 20px 20px;
-      padding: 12px;
+    .ts-choose-btn {
+      display: inline-block;
+      padding: 13px 36px;
       border-radius: 99px;
       border: none;
       font-family: 'Inter', sans-serif;
-      font-size: 0.85rem;
-      font-weight: 600;
-      cursor: pointer;
-      letter-spacing: 0.04em;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      transition: all 0.2s;
+      cursor: pointer;
       background: linear-gradient(135deg, #a07830, #c9a24a);
       color: #fff;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 20px rgba(160,120,48,0.4);
     }
 
-    .tc-dark .tc-info { background: #1a1a1a; }
-    .tc-light .tc-info { background: #ffffff; }
+    .ts-choose-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(160,120,48,0.55);
+    }
+
+    @media (max-width: 600px) {
+      .theme-screen { flex-direction: column; }
+      .ts-divider { width: 100%; height: 2px; top: 50%; left: 0; transform: translateY(-50%);
+        background: linear-gradient(90deg, transparent 0%, #c9a24a 20%, #c9a24a 80%, transparent 100%); }
+      .ts-half { flex: 1; min-height: 50vh; }
+      .ts-half:hover { flex: 1; }
+      .ts-label { top: 16px; }
+      .ts-label h2 { font-size: 1rem; }
+      .ts-half .ts-logo { width: 55%; }
+      .ts-half-name { font-size: 1.1rem; }
+    }
 
     /* ════════════════════════════════
        MAIN FORM (hidden until theme picked)
@@ -616,44 +657,39 @@
 <body>
 
 <!-- ════════════════════════════════
-     THEME PICKER (shows first)
+     THEME PICKER — FULL SCREEN SPLIT
 ════════════════════════════════ -->
 <div class="theme-screen" id="theme-screen">
-  <img src="logo-dark.png" class="ts-logo" alt="Gold Key Legacy" />
-  <h2 class="ts-title">First — pick your vibe.</h2>
-  <p class="ts-subtitle">This tells me which direction to take your design.</p>
 
-  <div class="theme-cards">
-    <!-- DARK CARD -->
-    <div class="theme-card tc-dark" onclick="pickTheme('dark')">
-      <div class="tc-preview">
-        <img src="logo-dark.png" alt="Dark theme" />
-        <div class="tc-mock-line"></div>
-        <div class="tc-mock-text"></div>
-        <div class="tc-mock-text" style="width:50px;"></div>
-      </div>
-      <div class="tc-info">
-        <div class="tc-name">Dark & Luxury</div>
-        <div class="tc-desc">Black, gold, and bold. Premium wealth management energy.</div>
-      </div>
-      <button class="tc-pick-btn">Choose This →</button>
-    </div>
+  <!-- Floating label -->
+  <div class="ts-label">
+    <h2>Pick your vibe.</h2>
+    <p>This tells me which direction to take your design.</p>
+  </div>
 
-    <!-- LIGHT CARD -->
-    <div class="theme-card tc-light" onclick="pickTheme('light')">
-      <div class="tc-preview">
-        <img src="logo-light.png" alt="Light theme" />
-        <div class="tc-mock-line"></div>
-        <div class="tc-mock-text"></div>
-        <div class="tc-mock-text" style="width:50px;"></div>
-      </div>
-      <div class="tc-info">
-        <div class="tc-name">Clean & Elegant</div>
-        <div class="tc-desc">White, cream, and gold. Sleek, modern, and approachable.</div>
-      </div>
-      <button class="tc-pick-btn">Choose This →</button>
+  <!-- Gold divider line -->
+  <div class="ts-divider"></div>
+
+  <!-- DARK HALF -->
+  <div class="ts-half ts-dark" onclick="pickTheme('dark')">
+    <img src="logo-dark.png" class="ts-logo" alt="Dark & Luxury" />
+    <div class="ts-half-footer">
+      <div class="ts-half-name">Dark & Luxury</div>
+      <div class="ts-half-desc">Black, gold, and bold.<br>Premium wealth management energy.</div>
+      <button class="ts-choose-btn">Choose This →</button>
     </div>
   </div>
+
+  <!-- LIGHT HALF -->
+  <div class="ts-half ts-light" onclick="pickTheme('light')">
+    <img src="logo-light.png" class="ts-logo" alt="Clean & Elegant" />
+    <div class="ts-half-footer">
+      <div class="ts-half-name">Clean & Elegant</div>
+      <div class="ts-half-desc">White, cream, and gold.<br>Sleek, modern, and approachable.</div>
+      <button class="ts-choose-btn">Choose This →</button>
+    </div>
+  </div>
+
 </div>
 
 <!-- ════════════════════════════════

@@ -1325,6 +1325,15 @@
       </div>
     </div>
 
+    <!-- AUTOSAVE TOAST -->
+    <div id="save-toast" style="
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(60px);
+      background: rgba(10,10,10,0.85); backdrop-filter: blur(8px);
+      color: #c9a24a; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.05em;
+      padding: 10px 22px; border-radius: 99px; border: 1px solid rgba(201,162,74,0.3);
+      z-index: 999; opacity: 0; transition: opacity 0.3s, transform 0.3s; pointer-events: none;
+    ">✓ Progress saved</div>
+
     <!-- SUCCESS -->
     <div class="success" id="success">
       <div class="success-icon">🔑</div>
@@ -1339,12 +1348,92 @@
 
 <script>
   const TOTAL_SECTIONS = 7;
+  const SAVE_KEY = 'gkl_discovery_progress';
   let currentSection = 0;
   const choiceValues = {};
   let selectedTheme = '';
+  let toastTimer = null;
+
+  /* ── AUTOSAVE ── */
+  function saveProgress() {
+    const textData = {};
+    document.querySelectorAll('input[name], textarea[name]').forEach(el => {
+      if (el.name && el.type !== 'hidden') textData[el.name] = el.value;
+    });
+    const state = { section: currentSection, theme: selectedTheme, choices: choiceValues, text: textData };
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch(e) {}
+    showToast();
+  }
+
+  function showToast() {
+    const t = document.getElementById('save-toast');
+    t.style.opacity = '1';
+    t.style.transform = 'translateX(-50%) translateY(0)';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      t.style.opacity = '0';
+      t.style.transform = 'translateX(-50%) translateY(60px)';
+    }, 2000);
+  }
+
+  function restoreProgress() {
+    let state;
+    try { state = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch(e) { return false; }
+    if (!state || !state.theme) return false;
+
+    // Restore theme
+    pickTheme(state.theme, true);
+
+    // Restore text inputs
+    if (state.text) {
+      Object.entries(state.text).forEach(([name, val]) => {
+        const el = document.querySelector(`[name="${name}"]`);
+        if (el) el.value = val;
+      });
+    }
+
+    // Restore choice buttons
+    if (state.choices) {
+      Object.entries(state.choices).forEach(([name, val]) => {
+        choiceValues[name] = val;
+        const group = document.querySelector(`.choices[data-name="${name}"]`);
+        if (group) {
+          const vals = val.split(', ');
+          group.querySelectorAll('.choice-btn').forEach(btn => {
+            if (vals.includes(btn.textContent.trim())) btn.classList.add('selected');
+          });
+        }
+        // Vibe cards
+        const vibeContainer = document.querySelector('.vibe-cards');
+        if (name === 'q21' && vibeContainer) {
+          vibeContainer.querySelectorAll('.vibe-card').forEach(card => {
+            if (card.querySelector('.vibe-title').textContent === val) {
+              card.classList.add('selected');
+              document.getElementById('q21-value').value = val;
+            }
+          });
+        }
+        // Security cards
+        if (name === 'q42') {
+          document.querySelectorAll('.security-card').forEach(card => {
+            if (card.querySelector('.sc-title').textContent === val) {
+              card.classList.add('selected');
+              document.getElementById('q42-value').value = val;
+            }
+          });
+        }
+      });
+    }
+
+    // Restore section
+    if (state.section && state.section > 0) {
+      goTo(state.section);
+    }
+    return true;
+  }
 
   /* ── THEME PICKER ── */
-  function pickTheme(theme) {
+  function pickTheme(theme, silent) {
     selectedTheme = theme;
     choiceValues['theme_preference'] = theme === 'dark' ? 'Dark & Luxury' : 'Clean & Elegant';
 
@@ -1359,6 +1448,7 @@
     document.getElementById('theme-screen').classList.add('hidden');
     document.getElementById('form-wrap').classList.add('visible');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (!silent) saveProgress();
   }
 
   /* ── NAVIGATION ── */
@@ -1369,6 +1459,7 @@
     if (target) target.classList.add('active');
     updateProgress();
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    saveProgress();
   }
 
   function updateProgress() {
@@ -1394,6 +1485,7 @@
       const selected = [...group.querySelectorAll('.choice-btn.selected')].map(b => b.textContent.trim());
       choiceValues[name] = selected.join(', ');
     }
+    saveProgress();
   }
 
   function selectVibe(card, name) {
@@ -1402,6 +1494,7 @@
     const title = card.querySelector('.vibe-title').textContent;
     document.getElementById(name + '-value').value = title;
     choiceValues[name] = title;
+    saveProgress();
   }
 
   function selectSecurity(card, name) {
@@ -1410,7 +1503,15 @@
     const title = card.querySelector('.sc-title').textContent;
     document.getElementById(name + '-value').value = title;
     choiceValues[name] = title;
+    saveProgress();
   }
+
+  /* ── AUTOSAVE ON TEXT INPUT ── */
+  document.addEventListener('input', e => {
+    if (e.target.matches('input[name], textarea[name]') && e.target.type !== 'hidden') {
+      saveProgress();
+    }
+  });
 
   /* ── SUBMIT ── */
   function submitForm() {
@@ -1431,6 +1532,7 @@
     })
     .then(res => {
       if (res.ok) {
+        try { localStorage.removeItem(SAVE_KEY); } catch(e) {}
         document.getElementById('section-' + currentSection).classList.remove('active');
         document.getElementById('success').classList.add('active');
         document.getElementById('progressFill').style.width = '100%';
@@ -1445,6 +1547,11 @@
       alert('Something went wrong. Please try again or contact Cal directly.');
     });
   }
+
+  /* ── ON LOAD — try to restore saved progress ── */
+  window.addEventListener('DOMContentLoaded', () => {
+    restoreProgress();
+  });
 </script>
 
 </body>
